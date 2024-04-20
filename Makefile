@@ -10,6 +10,9 @@ main: main.cpp
 parser: parser.cpp
 	clang++ -std=c++17 -I $(INCDIR) $(LDFLAGS) -lclang -o parser parser.cpp
 
+lexer: lexer-c.cpp
+	clang++ -std=c++17 -I $(INCDIR) $(LDFLAGS) -lclang -o lexer lexer-c.cpp
+
 clean:
 	rm -f main
 	rm -f *.ll
