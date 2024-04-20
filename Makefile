@@ -13,6 +13,9 @@ parser: parser.cpp
 lexer: lexer-c.cpp
 	clang++ -std=c++17 -I $(INCDIR) $(LDFLAGS) -lclang -o lexer lexer-c.cpp
 
+minicc: minicc.cpp
+	clang++ -std=c++17 -I $(INCDIR) $(LDFLAGS) -lclang-cpp -o minicc minicc.cpp
+
 clean:
 	rm -f main
 	rm -f *.ll
