@@ -8,7 +8,7 @@ main: main.cpp
 	llvm-dis min.bc
 
 parser: parser.cpp
-	clang++ -std=c++17 -I $(INCDIR) $(LDFLAGS) -lclang -o parser parser.cpp
+	clang++ -std=c++17 -I $(INCDIR) $(LDFLAGS) -lclang -lclang-cpp -o parser parser.cpp
 
 lexer: lexer-c.cpp
 	clang++ -std=c++17 -I $(INCDIR) $(LDFLAGS) -lclang -o lexer lexer-c.cpp

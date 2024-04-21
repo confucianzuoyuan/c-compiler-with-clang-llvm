@@ -1,16 +1,5 @@
-int a[5];
-int a[6];
+int puts(char *c);
 
-int min(int a, int b)
-{
-    if (a > b)
-    {
-        return a;
-    }
-    return b;
-}
-
-int main()
-{
-    return min(1, 2);
+int main(void) {
+    puts("Hello, world!");
 }

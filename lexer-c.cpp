@@ -16,9 +16,6 @@ int main(int argc, char **argv)
 {
     cl::ParseCommandLineOptions(argc, argv, "My tokenizer\n");
     CXIndex index = clang_createIndex(1, 0);
-    const char *args[] = {
-        "-I/usr/include",
-        "-I/usr/local/include"};
 
     std::ifstream in_file(FileName.c_str(), std::ios::binary);
     in_file.seekg(0, std::ios::end);

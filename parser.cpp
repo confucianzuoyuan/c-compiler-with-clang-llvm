@@ -1,15 +1,36 @@
 #include <clang-c/Index.h>
+#include "llvm/Support/CommandLine.h"
 #include <iostream>
+#include <fstream>
 
-int main()
+#include <clang/Basic/DiagnosticOptions.h>
+#include <clang/CodeGen/CodeGenAction.h>
+#include <clang/Frontend/CompilerInstance.h>
+#include <clang/Frontend/TextDiagnosticPrinter.h>
+#include <clang/Lex/PreprocessorOptions.h>
+
+#include <llvm/IR/Module.h>
+#include <llvm/Support/Host.h>
+#include <llvm/Support/TargetSelect.h>
+
+using namespace llvm;
+
+static cl::opt<std::string>
+    FileName(cl::Positional, cl::desc("Input file"), cl::Required);
+
+int main(int argc, char **argv)
 {
-    // Create an index with excludeDeclarationsFromPCH = 1, displayDiagnostics = 0
-    CXIndex index = clang_createIndex(1, 0);
+    cl::ParseCommandLineOptions(argc, argv, "My tokenizer\n");
+    CXIndex index = clang_createIndex(0, 0);
+
+    std::ifstream in_file(FileName.c_str(), std::ios::binary);
+    in_file.seekg(0, std::ios::end);
+    int file_size = in_file.tellg();
 
     // Parse the source file into a translation unit
     CXTranslationUnit translationUnit = clang_parseTranslationUnit(
         index,
-        "example.c",             // Assume the name of the file is example.c
+        FileName.c_str(),        // Assume the name of the file is example.c
         nullptr, 0,              // Command line args and number of args
         nullptr, 0,              // Unsaved files and number of unsaved files
         CXTranslationUnit_None); // Options
@@ -20,8 +41,7 @@ int main()
         exit(-1);
     }
 
-    // Get the root cursor of the translation unit
-    CXCursor rootCursor = clang_getTranslationUnitCursor(translationUnit);
+    /// 如果有语义分析错误，打印错误
     unsigned diagnosticCount = clang_getNumDiagnostics(translationUnit);
     for (unsigned i = 0; i < diagnosticCount; ++i)
     {
@@ -45,8 +65,8 @@ int main()
     }
     std::cout << std::endl;
 
-    // lexer
-    CXFile file = clang_getFile(translationUnit, "example.c");
+    // 词法分析
+    CXFile file = clang_getFile(translationUnit, FileName.c_str());
     CXSourceLocation loc_start =
         clang_getLocationForOffset(translationUnit, file, 0);
     CXSourceLocation loc_end =
@@ -100,11 +120,97 @@ int main()
     };
 
     // Visit all the nodes in the AST starting from the root cursor
+    // Get the root cursor of the translation unit
+    // 打印AST语法分析树
+    CXCursor rootCursor = clang_getTranslationUnitCursor(translationUnit);
     clang_visitChildren(rootCursor, printAST, nullptr);
 
     // Clean up
     clang_disposeTranslationUnit(translationUnit);
     clang_disposeIndex(index);
+
+    /// 生成llvm ir
+    // Setup custom diagnostic options.
+    IntrusiveRefCntPtr<clang::DiagnosticOptions> diag_opts(new clang::DiagnosticOptions());
+    diag_opts->ShowColors = 1;
+
+    // Setup custom diagnostic consumer.
+    //
+    // We configure the consumer with our custom diagnostic options and set it
+    // up that diagnostic messages are printed to stderr.
+    std::unique_ptr<clang::DiagnosticConsumer> diag_print =
+        std::make_unique<clang::TextDiagnosticPrinter>(llvm::errs(), diag_opts.get());
+
+    // Create custom diagnostics engine.
+    //
+    // The engine will NOT take ownership of the DiagnosticConsumer object.
+    auto diag_eng = std::make_unique<clang::DiagnosticsEngine>(
+        nullptr /* DiagnosticIDs */, diag_opts, diag_print.get(),
+        false /* own DiagnosticConsumer */);
+
+    // Create compiler instance.
+    clang::CompilerInstance cc;
+
+    // Setup compiler invocation.
+    //
+    // We are only passing a single argument, which is the pseudo file name for
+    // our code `code_fname`. We will be remapping this pseudo file name to an
+    // in-memory buffer via the preprocessor options below.
+    //
+    // The CompilerInvocation is a helper class which holds the data describing
+    // a compiler invocation (eg include paths, code generation options,
+    // warning flags, ..).
+    if (!clang::CompilerInvocation::CreateFromArgs(cc.getInvocation(),
+                                                   ArrayRef<const char *>({FileName.c_str()}),
+                                                   *diag_eng))
+    {
+        std::puts("Failed to create CompilerInvocation!");
+        return 1;
+    }
+
+    // Setup a TextDiagnosticPrinter printer with our diagnostic options to
+    // handle diagnostic messaged.
+    //
+    // The compiler will NOT take ownership of the DiagnosticConsumer object.
+    cc.createDiagnostics(diag_print.get(), false /* own DiagnosticConsumer */);
+
+    // Create in-memory readonly buffer with pointing to our C code.
+    std::ifstream t(FileName.c_str());
+    t.seekg(0, std::ios::end);
+    size_t size = t.tellg();
+    std::string code_input(size, ' ');
+    t.seekg(0);
+    t.read(&code_input[0], size);
+    std::unique_ptr<MemoryBuffer> code_buffer =
+        MemoryBuffer::getMemBuffer(code_input);
+    // Configure remapping from pseudo file name to in-memory code buffer
+    // code_fname -> code_buffer.
+    //
+    // Ownership of the MemoryBuffer object is moved, except we would set
+    // `RetainRemappedFileBuffers = 1` in the PreprocessorOptions.
+    cc.getPreprocessorOpts().addRemappedFile(FileName.c_str(), code_buffer.release());
+
+    // Create action to generate LLVM IR.
+    //
+    // If created with default arguments, the EmitLLVMOnlyAction will allocate
+    // an owned LLVMContext and free it once the action goes out of scope.
+    //
+    // To keep the context after the action goes out of scope, either pass a
+    // LLVMContext (borrowed) when creating the EmitLLVMOnlyAction or call
+    // takeLLVMContext() to move ownership out of the action.
+    clang::EmitLLVMOnlyAction action;
+    // Run action against our compiler instance.
+    if (!cc.ExecuteAction(action))
+    {
+        std::puts("Failed to run EmitLLVMOnlyAction!");
+        return 1;
+    }
+
+    // Take generated LLVM IR module and print to stdout.
+    if (auto mod = action.takeModule())
+    {
+        mod->print(llvm::outs(), nullptr);
+    }
 
     return 0;
 }
