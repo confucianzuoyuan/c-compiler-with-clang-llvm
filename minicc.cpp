@@ -22,9 +22,11 @@ using llvm::MemoryBuffer;
 
 int main() {
     const char* code_fname = "jit.c";
+    // const char* code_input =
+    //     "struct S { int a; int b; };\n"
+    //     "void init(struct S* s) { s->a = 42; s->b = 1337; }\n";
     const char* code_input =
-        "struct S { int a; int b; };\n"
-        "void init(struct S* s) { s->a = 42; s->b = 1337; }\n";
+        "int main() {return 1;}";
 
     // Setup custom diagnostic options.
     IntrusiveRefCntPtr<DiagnosticOptions> diag_opts(new DiagnosticOptions());
