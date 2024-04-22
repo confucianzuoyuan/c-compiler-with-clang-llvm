@@ -16,6 +16,9 @@ lexer: lexer-c.cpp
 minicc: minicc.cpp
 	clang++ -std=c++17 -I $(INCDIR) $(LDFLAGS) -lclang-cpp -o minicc minicc.cpp
 
+clanglibtest: clanglibtest.cpp
+	clang++ -std=c++17 -I $(INCDIR) $(LDFLAGS) -lclang-cpp -lclang -o clanglibtest clanglibtest.cpp
+
 clean:
 	rm -f main
 	rm -f *.ll

@@ -13,6 +13,44 @@
 #include <llvm/Support/Host.h>
 #include <llvm/Support/TargetSelect.h>
 
+std::string getCursorKindName(CXCursorKind cursorKind)
+{
+    CXString kindName = clang_getCursorKindSpelling(cursorKind);
+    std::string result = clang_getCString(kindName);
+
+    clang_disposeString(kindName);
+    return result;
+}
+
+std::string getCursorSpelling(CXCursor cursor)
+{
+    CXString cursorSpelling = clang_getCursorSpelling(cursor);
+    std::string result = clang_getCString(cursorSpelling);
+
+    clang_disposeString(cursorSpelling);
+    return result;
+}
+
+CXChildVisitResult prettyPrintAst(CXCursor cursor, CXCursor /* parent */, CXClientData clientData)
+{
+    CXSourceLocation location = clang_getCursorLocation(cursor);
+    if (clang_Location_isFromMainFile(location) == 0)
+        return CXChildVisit_Continue;
+
+    CXCursorKind cursorKind = clang_getCursorKind(cursor);
+
+    unsigned int curLevel = *(reinterpret_cast<unsigned int *>(clientData));
+    unsigned int nextLevel = curLevel + 1;
+
+    std::cout << std::string(curLevel, '-') << " " << getCursorKindName(cursorKind) << " (" << getCursorSpelling(cursor) << ")\n";
+
+    clang_visitChildren(cursor,
+                        prettyPrintAst,
+                        &nextLevel);
+
+    return CXChildVisit_Continue;
+}
+
 using namespace llvm;
 
 int main(int argc, char **argv)
@@ -119,33 +157,14 @@ int main(int argc, char **argv)
         std::cout << std::endl;
     }
 
-    // A lambda function to recursively print the AST nodes
-    auto printAST = [](CXCursor c, CXCursor parent, CXClientData clientData) -> CXChildVisitResult
-    {
-        if (clang_Location_isFromMainFile(clang_getCursorLocation(c)) == 0)
-            return CXChildVisit_Continue;
-
-        CXString cursorKindName = clang_getCursorKindSpelling(clang_getCursorKind(c));
-        CXString cursorSpelling = clang_getCursorSpelling(c);
-
-        CXString ppast = clang_getCursorPrettyPrinted(c, nullptr);
-        std::cout << clang_getCString(ppast) << std::endl;
-
-        std::cout << "    " << clang_getCString(cursorKindName) << " " << clang_getCString(cursorSpelling) << std::endl;
-
-        clang_disposeString(cursorKindName);
-        clang_disposeString(cursorSpelling);
-
-        return CXChildVisit_Recurse;
-    };
-
     // Visit all the nodes in the AST starting from the root cursor
     // Get the root cursor of the translation unit
     // 打印AST语法分析树
     if (strcmp(argv[1], "--emit-ast") == 0)
     {
         CXCursor rootCursor = clang_getTranslationUnitCursor(translationUnit);
-        clang_visitChildren(rootCursor, printAST, nullptr);
+        unsigned int depth = 0;
+        clang_visitChildren(rootCursor, prettyPrintAst, &depth);
     }
 
     // Clean up
