@@ -77,10 +77,13 @@ int main(int argc, char **argv)
     if (strcmp(argv[1], "--emit-tokens") == 0)
     {
         CXFile file = clang_getFile(translationUnit, argv[2]);
+        unsigned int line;
+        unsigned int column;
+        unsigned int offset;
         CXSourceLocation loc_start =
             clang_getLocationForOffset(translationUnit, file, 0);
         CXSourceLocation loc_end =
-            clang_getLocationForOffset(translationUnit, file, 60);
+            clang_getLocationForOffset(translationUnit, file, file_size);
         CXSourceRange range = clang_getRange(loc_start, loc_end);
         unsigned numTokens = 0;
         CXToken *tokens = NULL;
@@ -89,6 +92,9 @@ int main(int argc, char **argv)
         {
             enum CXTokenKind kind = clang_getTokenKind(tokens[i]);
             CXString name = clang_getTokenSpelling(translationUnit, tokens[i]);
+            CXSourceLocation loc = clang_getTokenLocation(translationUnit, tokens[i]);
+            clang_getFileLocation(loc, &file, &line, &column, &offset);
+            std::cout << "line number " << line << ": ";
             switch (kind)
             {
             case CXToken_Punctuation:
@@ -101,7 +107,7 @@ int main(int argc, char **argv)
                 std::cout << "IDENTIFIER(" << clang_getCString(name) << ") ";
                 break;
             case CXToken_Literal:
-                std::cout << "COMMENT(" << clang_getCString(name) << ") ";
+                std::cout << "LITERAL(" << clang_getCString(name) << ") ";
                 break;
             default:
                 std::cout << "UNKNOWN(" << clang_getCString(name) << ") ";
@@ -122,7 +128,10 @@ int main(int argc, char **argv)
         CXString cursorKindName = clang_getCursorKindSpelling(clang_getCursorKind(c));
         CXString cursorSpelling = clang_getCursorSpelling(c);
 
-        std::cout << clang_getCString(cursorKindName) << " " << clang_getCString(cursorSpelling) << std::endl;
+        CXString ppast = clang_getCursorPrettyPrinted(c, nullptr);
+        std::cout << clang_getCString(ppast) << std::endl;
+
+        std::cout << "    " << clang_getCString(cursorKindName) << " " << clang_getCString(cursorSpelling) << std::endl;
 
         clang_disposeString(cursorKindName);
         clang_disposeString(cursorSpelling);

@@ -1,0 +1,9 @@
+FunctionDecl puts
+ParmDecl c
+FunctionDecl main
+CompoundStmt 
+CallExpr puts
+UnexposedExpr puts
+DeclRefExpr puts
+UnexposedExpr 
+StringLiteral "Hello, world!"
