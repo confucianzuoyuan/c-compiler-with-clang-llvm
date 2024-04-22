@@ -1,9 +1,30 @@
-FunctionDecl puts
-ParmDecl c
-FunctionDecl main
-CompoundStmt 
-CallExpr puts
-UnexposedExpr puts
-DeclRefExpr puts
-UnexposedExpr 
-StringLiteral "Hello, world!"
+ FunctionDecl (puts)
+- ParmDecl (c)
+ FunctionDecl (printf)
+- UnexposedAttr ()
+- ParmDecl (format)
+ FunctionDecl (malloc)
+- ParmDecl ()
+ FunctionDecl (main)
+- CompoundStmt ()
+-- DeclStmt ()
+--- VarDecl (ptr)
+---- CStyleCastExpr ()
+----- CallExpr (malloc)
+------ UnexposedExpr (malloc)
+------- DeclRefExpr (malloc)
+------ BinaryOperator ()
+------- UnexposedExpr ()
+-------- IntegerLiteral ()
+------- UnaryExpr ()
+-- CallExpr (puts)
+--- UnexposedExpr (puts)
+---- DeclRefExpr (puts)
+--- UnexposedExpr ()
+---- StringLiteral ("Hello, world!")
+-- CallExpr (printf)
+--- UnexposedExpr (printf)
+---- DeclRefExpr (printf)
+--- UnexposedExpr ()
+---- UnexposedExpr ()
+----- StringLiteral ("hello world\r\n")
